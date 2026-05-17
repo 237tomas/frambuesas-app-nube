@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "../../../../../generated/prisma/client";
 
 const editarClienteSchema = z.object({
   id: z.string().trim().min(1),
