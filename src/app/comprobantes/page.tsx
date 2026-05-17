@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: "Consulta global de comprobantes por cliente y fecha",
 };
 
+export const dynamic = "force-dynamic";
+
 type ComprobantesGlobalPageProps = {
   searchParams: Promise<{
     clienteId?: string;

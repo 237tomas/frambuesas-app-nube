@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: "Actualizacion de datos del cliente",
 };
 
+export const dynamic = "force-dynamic";
+
 type EditarClientePageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ ok?: string; error?: string }>;

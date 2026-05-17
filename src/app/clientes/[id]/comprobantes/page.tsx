@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Generacion y consulta de comprobantes en PDF",
 };
 
+export const dynamic = "force-dynamic";
+
 type ComprobantesPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ ok?: string; error?: string; from?: string; to?: string }>;

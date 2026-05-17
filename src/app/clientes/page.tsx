@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Listado de clientes registrados",
 };
 
+export const dynamic = "force-dynamic";
+
 function formatPrecio(value: number): string {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
