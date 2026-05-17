@@ -15,7 +15,7 @@ function getDatabaseUrl(): string {
   return databaseUrl;
 }
 
-function createPrismaClient() {
+function createPrismaClient(): PrismaClient {
   const connectionString = getDatabaseUrl();
   const isSupabaseProdConnection =
     process.env.NODE_ENV === "production" && connectionString.includes("supabase.com");
@@ -32,13 +32,19 @@ function createPrismaClient() {
   });
 }
 
-export const prisma =
-  process.env.NODE_ENV === "production"
-    ? globalForPrisma.prisma ?? createPrismaClient()
-    : createPrismaClient();
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = undefined;
-} else {
-  globalForPrisma.prisma = prisma;
+  return globalForPrisma.prisma;
 }
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, prop, receiver);
+
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
