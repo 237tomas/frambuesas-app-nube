@@ -5,6 +5,10 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+export function hasDatabaseUrl(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
 function getDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
 

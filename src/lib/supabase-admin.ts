@@ -4,6 +4,12 @@ const globalForSupabase = globalThis as unknown as {
   supabaseAdmin: SupabaseClient | undefined;
 };
 
+export function hasSupabaseAdminEnv(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+}
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
 

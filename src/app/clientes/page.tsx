@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { toggleClienteActivo } from "./actions";
 
 export const metadata: Metadata = {
@@ -40,9 +40,12 @@ function getMessage(
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
   const { ok, error } = await searchParams;
   const message = getMessage(ok, error);
-  const clientes = await prisma.cliente.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const isDatabaseConfigured = hasDatabaseUrl();
+  const clientes = isDatabaseConfigured
+    ? await prisma.cliente.findMany({
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4 py-10">
@@ -93,13 +96,24 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
           </p>
         ) : null}
 
+        {!isDatabaseConfigured ? (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            Configura la variable de entorno <code>DATABASE_URL</code> para cargar los
+            clientes. Mientras no exista, esta vista se mostrara sin datos.
+          </div>
+        ) : null}
+
         {clientes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center">
             <p className="text-base font-medium text-zinc-700">
-              Aun no hay clientes registrados.
+              {isDatabaseConfigured
+                ? "Aun no hay clientes registrados."
+                : "La base de datos aun no esta configurada."}
             </p>
             <p className="mt-2 text-sm text-zinc-500">
-              Crea el primero para comenzar a operar.
+              {isDatabaseConfigured
+                ? "Crea el primero para comenzar a operar."
+                : "Cuando definas DATABASE_URL, aqui aparecera el listado."}
             </p>
           </div>
         ) : (

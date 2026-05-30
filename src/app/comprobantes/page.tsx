@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getComprobantesBucket, getSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  getComprobantesBucket,
+  getSupabaseAdminClient,
+  hasSupabaseAdminEnv,
+} from "@/lib/supabase-admin";
 import { getPublicAppUrl, isExternallyReachableAppUrl } from "@/lib/app-url";
+import { ClienteSearchField } from "./cliente-search-field";
 
 export const metadata: Metadata = {
   title: "Comprobantes Global",
@@ -17,10 +22,9 @@ type ComprobantesGlobalPageProps = {
     from?: string;
     to?: string;
     page?: string;
-    pageSize?: string;
   }>;
 };
-const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const PAGE_SIZE = 10;
 
 function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -71,14 +75,10 @@ function buildWhatsappMessage(params: {
 export default async function ComprobantesGlobalPage({
   searchParams,
 }: ComprobantesGlobalPageProps) {
-  const { clienteId, from, to, page, pageSize } = await searchParams;
+  const { clienteId, from, to, page } = await searchParams;
   const fromDate = parseDateStart(from);
   const toDate = parseDateEnd(to);
   const currentPage = Math.max(1, Number.parseInt(page ?? "1", 10) || 1);
-  const requestedPageSize = Number.parseInt(pageSize ?? "10", 10);
-  const safePageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as 10 | 25 | 50)
-    ? requestedPageSize
-    : 10;
 
   const clientes = await prisma.cliente.findMany({
     orderBy: { nombre: "asc" },
@@ -100,24 +100,25 @@ export default async function ComprobantesGlobalPage({
   const totalItems = await prisma.comprobante.count({
     where: whereClause,
   });
-  const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
 
   const comprobantes = await prisma.comprobante.findMany({
     where: whereClause,
     orderBy: { createdAt: "desc" },
-    take: safePageSize,
-    skip: (safePage - 1) * safePageSize,
+    take: PAGE_SIZE,
+    skip: (safePage - 1) * PAGE_SIZE,
   });
 
   const clienteMap = new Map(clientes.map((c) => [c.id, c]));
-  const bucket = getComprobantesBucket();
-  const supabaseAdmin = getSupabaseAdminClient();
   const appUrl = getPublicAppUrl();
   const canUseShortLinks = isExternallyReachableAppUrl(appUrl);
+  const hasStorageConfig = hasSupabaseAdminEnv();
 
   const signedUrlMap = new Map<string, string>();
-  if (comprobantes.length > 0) {
+  if (hasStorageConfig && comprobantes.length > 0) {
+    const bucket = getComprobantesBucket();
+    const supabaseAdmin = getSupabaseAdminClient();
     const signedResults = await Promise.all(
       comprobantes.map((item) =>
         supabaseAdmin.storage
@@ -140,7 +141,6 @@ export default async function ComprobantesGlobalPage({
     if (clienteId) params.set("clienteId", clienteId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
-    params.set("pageSize", String(safePageSize));
     params.set("page", String(targetPage));
     return `/comprobantes?${params.toString()}`;
   };
@@ -176,28 +176,24 @@ export default async function ComprobantesGlobalPage({
           </div>
         </div>
 
-        <form className="mb-6 grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-4 sm:items-end">
+        <form className="mb-6 grid gap-5 rounded-3xl border border-zinc-200 bg-zinc-50 p-5 sm:grid-cols-4 sm:items-end sm:p-6">
           <input type="hidden" name="page" value="1" />
           <div className="grid gap-2 sm:col-span-2">
-            <label htmlFor="clienteId" className="text-sm font-medium text-zinc-800">
+            <label htmlFor="clienteId" className="text-base font-medium text-zinc-800">
               Cliente
             </label>
-            <select
-              id="clienteId"
-              name="clienteId"
-              defaultValue={clienteId ?? ""}
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
-            >
-              <option value="">Todos</option>
-              {clientes.map((cliente) => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nombre} ({cliente.rut})
-                </option>
-              ))}
-            </select>
+            <ClienteSearchField
+              inputId="clienteId"
+              clientes={clientes.map((cliente) => ({
+                id: cliente.id,
+                nombre: cliente.nombre,
+                rut: cliente.rut,
+              }))}
+              selectedClienteId={clienteId}
+            />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="from" className="text-sm font-medium text-zinc-800">
+            <label htmlFor="from" className="text-base font-medium text-zinc-800">
               Desde
             </label>
             <input
@@ -205,11 +201,11 @@ export default async function ComprobantesGlobalPage({
               name="from"
               type="date"
               defaultValue={from ?? ""}
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
+              className="h-14 rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="to" className="text-sm font-medium text-zinc-800">
+            <label htmlFor="to" className="text-base font-medium text-zinc-800">
               Hasta
             </label>
             <input
@@ -217,41 +213,32 @@ export default async function ComprobantesGlobalPage({
               name="to"
               type="date"
               defaultValue={to ?? ""}
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
+              className="h-14 rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
             />
           </div>
-          <div className="grid gap-2">
-            <label htmlFor="pageSize" className="text-sm font-medium text-zinc-800">
-              Items por pagina
-            </label>
-            <select
-              id="pageSize"
-              name="pageSize"
-              defaultValue={String(safePageSize)}
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
-            >
-              {PAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="sm:col-span-4 flex gap-2">
+          <div className="sm:col-span-4 flex justify-center gap-3 pt-1">
             <button
               type="submit"
-              className="inline-flex h-10 items-center rounded-full bg-rose-600 px-5 text-sm font-semibold text-white transition hover:bg-rose-700"
+              className="inline-flex h-12 items-center rounded-full bg-rose-600 px-7 text-base font-semibold text-white transition hover:bg-rose-700"
             >
-              Filtrar
+              Buscar
             </button>
             <Link
               href="/comprobantes"
-              className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              className="inline-flex h-12 items-center rounded-full border border-zinc-300 px-7 text-base font-medium text-zinc-700 transition hover:bg-zinc-50"
             >
               Limpiar
             </Link>
           </div>
         </form>
+
+        {!hasStorageConfig ? (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            Faltan variables de Supabase para generar enlaces de descarga y WhatsApp.
+            Configura <code>NEXT_PUBLIC_SUPABASE_URL</code> y{" "}
+            <code>SUPABASE_SERVICE_ROLE_KEY</code> para habilitarlos.
+          </div>
+        ) : null}
 
         {comprobantes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 text-center text-sm text-zinc-600">
@@ -339,6 +326,11 @@ export default async function ComprobantesGlobalPage({
                                 WhatsApp
                               </a>
                             ) : null}
+                            {!signedUrl && !waHref ? (
+                              <span className="inline-flex h-9 items-center rounded-full border border-zinc-200 px-4 text-xs font-medium text-zinc-400">
+                                Sin enlaces
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -350,7 +342,7 @@ export default async function ComprobantesGlobalPage({
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-zinc-600">
-                Pagina {safePage} de {totalPages} ({totalItems} comprobantes, {safePageSize} por pagina)
+                Pagina {safePage} de {totalPages} ({totalItems} comprobantes, {PAGE_SIZE} por pagina)
               </p>
               <div className="flex gap-2">
                 {safePage > 1 ? (
