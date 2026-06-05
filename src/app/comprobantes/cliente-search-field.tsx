@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 
 type ClienteOption = {
   id: string;
@@ -41,11 +41,6 @@ export function ClienteSearchField({
   const [selectedId, setSelectedId] = useState(selectedClienteId ?? "");
   const [isOpen, setIsOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
-
-  useEffect(() => {
-    setSelectedId(selectedClienteId ?? "");
-    setQuery(selectedCliente ? formatClienteLabel(selectedCliente) : "");
-  }, [selectedCliente, selectedClienteId]);
 
   const normalizedQuery = normalizeSearchValue(deferredQuery);
   const selectedLabel = selectedCliente ? formatClienteLabel(selectedCliente) : "";

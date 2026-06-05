@@ -183,6 +183,7 @@ export default async function ComprobantesGlobalPage({
               Cliente
             </label>
             <ClienteSearchField
+              key={clienteId ?? "todos-los-clientes"}
               inputId="clienteId"
               clientes={clientes.map((cliente) => ({
                 id: cliente.id,
