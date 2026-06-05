@@ -115,23 +115,31 @@ export default async function ComprobantesGlobalPage({
   const canUseShortLinks = isExternallyReachableAppUrl(appUrl);
   const hasStorageConfig = hasSupabaseAdminEnv();
 
-  const signedUrlMap = new Map<string, string>();
+  const signedDownloadUrlMap = new Map<string, string>();
+  const signedViewUrlMap = new Map<string, string>();
   if (hasStorageConfig && comprobantes.length > 0) {
     const bucket = getComprobantesBucket();
     const supabaseAdmin = getSupabaseAdminClient();
     const signedResults = await Promise.all(
       comprobantes.map((item) =>
-        supabaseAdmin.storage
-          .from(bucket)
-          .createSignedUrl(item.storagePath, 60 * 60, {
-            download: `comprobante-${item.folio}.pdf`,
-          }),
+        Promise.all([
+          supabaseAdmin.storage.from(bucket).createSignedUrl(item.storagePath, 60 * 60),
+          supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUrl(item.storagePath, 60 * 60, {
+              download: `comprobante-${item.folio}.pdf`,
+            }),
+        ]),
       ),
     );
 
-    signedResults.forEach((result, index) => {
-      if (!result.error && result.data?.signedUrl) {
-        signedUrlMap.set(comprobantes[index].storagePath, result.data.signedUrl);
+    signedResults.forEach(([viewResult, downloadResult], index) => {
+      const storagePath = comprobantes[index].storagePath;
+      if (!viewResult.error && viewResult.data?.signedUrl) {
+        signedViewUrlMap.set(storagePath, viewResult.data.signedUrl);
+      }
+      if (!downloadResult.error && downloadResult.data?.signedUrl) {
+        signedDownloadUrlMap.set(storagePath, downloadResult.data.signedUrl);
       }
     });
   }
@@ -161,6 +169,12 @@ export default async function ComprobantesGlobalPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/compras"
+              className="inline-flex h-10 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Nueva Compra
+            </Link>
             <Link
               href="/"
               className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
@@ -271,13 +285,14 @@ export default async function ComprobantesGlobalPage({
                 <tbody className="divide-y divide-zinc-100 bg-white">
                   {comprobantes.map((item) => {
                     const cliente = clienteMap.get(item.clienteId);
-                    const signedUrl = signedUrlMap.get(item.storagePath);
+                    const signedViewUrl = signedViewUrlMap.get(item.storagePath);
+                    const signedDownloadUrl = signedDownloadUrlMap.get(item.storagePath);
                     const waPhone = cliente
                       ? normalizePhoneForWa(cliente.telefonoWhatsapp)
                       : "";
                     const linkForMessage = canUseShortLinks && item.shortCode
                       ? `${appUrl}/c/${item.shortCode}`
-                      : (signedUrl ?? "");
+                      : (signedDownloadUrl ?? "");
                     const waText = encodeURIComponent(
                       buildWhatsappMessage({
                         nombre: cliente?.nombre ?? "cliente",
@@ -306,9 +321,19 @@ export default async function ComprobantesGlobalPage({
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {signedUrl ? (
+                            {signedViewUrl ? (
                               <a
-                                href={signedUrl}
+                                href={signedViewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 items-center rounded-full bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800"
+                              >
+                                Ver
+                              </a>
+                            ) : null}
+                            {signedDownloadUrl ? (
+                              <a
+                                href={signedDownloadUrl}
                                 download={`comprobante-${item.folio}.pdf`}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -327,7 +352,7 @@ export default async function ComprobantesGlobalPage({
                                 WhatsApp
                               </a>
                             ) : null}
-                            {!signedUrl && !waHref ? (
+                            {!signedViewUrl && !signedDownloadUrl && !waHref ? (
                               <span className="inline-flex h-9 items-center rounded-full border border-zinc-200 px-4 text-xs font-medium text-zinc-400">
                                 Sin enlaces
                               </span>

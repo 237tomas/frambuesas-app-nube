@@ -15,6 +15,12 @@ export default function Home() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
+            href="/compras"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-rose-600 px-8 text-base font-semibold text-white transition hover:bg-rose-700"
+          >
+            Nueva compra
+          </Link>
+          <Link
             href="/comprobantes"
             className="inline-flex h-11 items-center justify-center rounded-full border border-rose-300 px-6 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
           >

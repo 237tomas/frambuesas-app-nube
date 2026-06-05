@@ -11,6 +11,7 @@ type ClienteOption = {
 type ClienteSearchFieldProps = {
   clientes: ClienteOption[];
   inputId: string;
+  compact?: boolean;
   selectedClienteId?: string;
 };
 
@@ -31,6 +32,7 @@ function normalizeSearchValue(value: string): string {
 
 export function ClienteSearchField({
   clientes,
+  compact = false,
   inputId,
   selectedClienteId,
 }: ClienteSearchFieldProps) {
@@ -65,7 +67,9 @@ export function ClienteSearchField({
         value={query}
         placeholder="Escribe nombre o RUT"
         autoComplete="off"
-        className="h-14 w-full rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
+        className={`w-full rounded-2xl border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100 ${
+          compact ? "h-12 text-sm" : "h-14 text-base"
+        }`}
         onFocus={() => setIsOpen(true)}
         onKeyDown={(event) => {
           if (
@@ -107,10 +111,12 @@ export function ClienteSearchField({
       <input type="hidden" name="clienteId" value={selectedId} />
 
       {showResults ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.625rem)] z-10 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/70">
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-10 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/70">
           <button
             type="button"
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-base text-zinc-700 transition hover:bg-zinc-50"
+            className={`flex w-full items-center justify-between px-4 text-left text-zinc-700 transition hover:bg-zinc-50 ${
+              compact ? "py-2.5 text-sm" : "py-3 text-base"
+            }`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setQuery(ALL_CLIENTES_LABEL);
@@ -131,7 +137,9 @@ export function ClienteSearchField({
                   <button
                     key={cliente.id}
                     type="button"
-                    className="flex w-full items-center justify-between px-4 py-3 text-left text-base text-zinc-700 transition hover:bg-zinc-50"
+                    className={`flex w-full items-center justify-between px-4 text-left text-zinc-700 transition hover:bg-zinc-50 ${
+                      compact ? "py-2.5 text-sm" : "py-3 text-base"
+                    }`}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       setQuery(label);

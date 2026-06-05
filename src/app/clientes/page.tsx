@@ -64,6 +64,12 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/compras"
+              className="inline-flex h-10 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Nueva Compra
+            </Link>
+            <Link
               href="/comprobantes"
               className="inline-flex h-10 items-center rounded-full border border-rose-300 px-4 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
             >

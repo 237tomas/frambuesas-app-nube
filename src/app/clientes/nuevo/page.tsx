@@ -52,7 +52,13 @@ export default async function NuevoClientePage({
               Completa los datos para registrar un cliente en el sistema.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/compras"
+              className="inline-flex h-10 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Nueva Compra
+            </Link>
             <Link
               href="/clientes"
               className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"

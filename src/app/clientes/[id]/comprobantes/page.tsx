@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getComprobantesBucket, getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getPublicAppUrl, isExternallyReachableAppUrl } from "@/lib/app-url";
-import { crearComprobante } from "./actions";
 
 export const metadata: Metadata = {
   title: "Comprobantes",
@@ -120,21 +119,29 @@ export default async function ComprobantesPage({
   const appUrl = getPublicAppUrl();
   const canUseShortLinks = isExternallyReachableAppUrl(appUrl);
 
-  const signedUrlMap = new Map<string, string>();
+  const signedDownloadUrlMap = new Map<string, string>();
+  const signedViewUrlMap = new Map<string, string>();
   if (comprobantes.length > 0) {
     const signedResults = await Promise.all(
       comprobantes.map((item) =>
-        supabaseAdmin.storage
-          .from(bucket)
-          .createSignedUrl(item.storagePath, 60 * 60, {
-            download: `comprobante-${item.folio}.pdf`,
-          }),
+        Promise.all([
+          supabaseAdmin.storage.from(bucket).createSignedUrl(item.storagePath, 60 * 60),
+          supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUrl(item.storagePath, 60 * 60, {
+              download: `comprobante-${item.folio}.pdf`,
+            }),
+        ]),
       ),
     );
 
-    signedResults.forEach((result, index) => {
-      if (!result.error && result.data?.signedUrl) {
-        signedUrlMap.set(comprobantes[index].storagePath, result.data.signedUrl);
+    signedResults.forEach(([viewResult, downloadResult], index) => {
+      const storagePath = comprobantes[index].storagePath;
+      if (!viewResult.error && viewResult.data?.signedUrl) {
+        signedViewUrlMap.set(storagePath, viewResult.data.signedUrl);
+      }
+      if (!downloadResult.error && downloadResult.data?.signedUrl) {
+        signedDownloadUrlMap.set(storagePath, downloadResult.data.signedUrl);
       }
     });
   }
@@ -155,6 +162,12 @@ export default async function ComprobantesPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/compras"
+              className="inline-flex h-10 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Nueva Compra
+            </Link>
             <Link
               href="/clientes"
               className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
@@ -181,68 +194,6 @@ export default async function ComprobantesPage({
             {message.text}
           </p>
         ) : null}
-
-        <section className="mb-8 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:p-6">
-          <h2 className="text-lg font-semibold text-zinc-900">Nuevo comprobante</h2>
-          <form action={crearComprobante} className="mt-4 grid gap-4">
-            <input type="hidden" name="clienteId" value={cliente.id} />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <label htmlFor="kilos" className="text-sm font-medium text-zinc-800">
-                  Kilos
-                </label>
-                <input
-                  id="kilos"
-                  name="kilos"
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  placeholder="10.5"
-                  className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <label htmlFor="precioKilo" className="text-sm font-medium text-zinc-800">
-                  Precio por kilo
-                </label>
-                <input
-                  id="precioKilo"
-                  name="precioKilo"
-                  type="number"
-                  min="1"
-                  step="1"
-                  defaultValue={cliente.precioKiloActual}
-                  className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="observaciones" className="text-sm font-medium text-zinc-800">
-                Observaciones
-              </label>
-              <textarea
-                id="observaciones"
-                name="observaciones"
-                rows={3}
-                className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                className="inline-flex h-11 items-center justify-center rounded-full bg-rose-600 px-6 text-sm font-semibold text-white transition hover:bg-rose-700"
-              >
-                Generar y subir PDF
-              </button>
-            </div>
-          </form>
-        </section>
 
         <section>
           <h2 className="mb-3 text-lg font-semibold text-zinc-900">Historial</h2>
@@ -314,55 +265,70 @@ export default async function ComprobantesPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 bg-white">
-                  {comprobantes.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3 text-sm font-medium text-zinc-900">{item.folio}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-700">{item.kilos}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-700">
-                        {formatCLP(item.montoTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-zinc-700">
-                        {item.createdAt.toLocaleString("es-CL")}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm">
-                        <div className="flex justify-end gap-2">
-                          {signedUrlMap.get(item.storagePath) ? (
-                            <a
-                              href={signedUrlMap.get(item.storagePath)}
-                              download={`comprobante-${item.folio}.pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex h-9 items-center rounded-full border border-zinc-300 px-4 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                            >
-                              Descargar
-                            </a>
-                          ) : (
-                            <span className="text-xs text-zinc-500">No disponible</span>
-                          )}
-                          {item.shortCode || signedUrlMap.get(item.storagePath) ? (
-                            <a
-                              href={`https://wa.me/${normalizePhoneForWa(cliente.telefonoWhatsapp)}?text=${encodeURIComponent(
-                                buildWhatsappMessage({
-                                  nombre: cliente.nombre,
-                                  folio: item.folio,
-                                  total: formatCLP(item.montoTotal),
-                                  fecha: item.createdAt.toLocaleString("es-CL"),
-                                  link: canUseShortLinks && item.shortCode
-                                    ? `${appUrl}/c/${item.shortCode}`
-                                    : (signedUrlMap.get(item.storagePath) ?? ""),
-                                }),
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex h-9 items-center rounded-full bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700"
-                            >
-                              WhatsApp
-                            </a>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {comprobantes.map((item) => {
+                    const signedViewUrl = signedViewUrlMap.get(item.storagePath);
+                    const signedDownloadUrl = signedDownloadUrlMap.get(item.storagePath);
+
+                    return (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3 text-sm font-medium text-zinc-900">{item.folio}</td>
+                        <td className="px-4 py-3 text-sm text-zinc-700">{item.kilos}</td>
+                        <td className="px-4 py-3 text-sm text-zinc-700">
+                          {formatCLP(item.montoTotal)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-zinc-700">
+                          {item.createdAt.toLocaleString("es-CL")}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm">
+                          <div className="flex justify-end gap-2">
+                            {signedViewUrl ? (
+                              <a
+                                href={signedViewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 items-center rounded-full bg-zinc-900 px-4 text-xs font-semibold text-white transition hover:bg-zinc-800"
+                              >
+                                Ver
+                              </a>
+                            ) : null}
+                            {signedDownloadUrl ? (
+                              <a
+                                href={signedDownloadUrl}
+                                download={`comprobante-${item.folio}.pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 items-center rounded-full border border-zinc-300 px-4 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                              >
+                                Descargar
+                              </a>
+                            ) : (
+                              <span className="text-xs text-zinc-500">No disponible</span>
+                            )}
+                            {item.shortCode || signedDownloadUrl ? (
+                              <a
+                                href={`https://wa.me/${normalizePhoneForWa(cliente.telefonoWhatsapp)}?text=${encodeURIComponent(
+                                  buildWhatsappMessage({
+                                    nombre: cliente.nombre,
+                                    folio: item.folio,
+                                    total: formatCLP(item.montoTotal),
+                                    fecha: item.createdAt.toLocaleString("es-CL"),
+                                    link: canUseShortLinks && item.shortCode
+                                      ? `${appUrl}/c/${item.shortCode}`
+                                      : (signedDownloadUrl ?? ""),
+                                  }),
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 items-center rounded-full bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                              >
+                                WhatsApp
+                              </a>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
