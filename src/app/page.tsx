@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
+import { cerrarSesion } from "./logout/actions";
 
-export default function Home() {
+export default async function Home() {
+  await requireAdmin();
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4">
       <main className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-8 shadow-lg shadow-zinc-200/70">
@@ -38,6 +42,14 @@ export default function Home() {
           >
             Ir a Nuevo Cliente
           </Link>
+          <form action={cerrarSesion}>
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+            >
+              Cerrar sesión
+            </button>
+          </form>
         </div>
       </main>
     </div>

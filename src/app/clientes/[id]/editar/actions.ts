@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
 const editarClienteSchema = z.object({
@@ -20,6 +21,8 @@ const editarClienteSchema = z.object({
 });
 
 export async function actualizarCliente(formData: FormData) {
+  await requireAdmin();
+
   const rawData = {
     id: formData.get("id"),
     rut: formData.get("rut"),

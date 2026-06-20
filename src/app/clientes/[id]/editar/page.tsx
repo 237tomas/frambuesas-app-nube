@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { actualizarCliente } from "./actions";
@@ -36,6 +37,8 @@ export default async function EditarClientePage({
   params,
   searchParams,
 }: EditarClientePageProps) {
+  await requireAdmin();
+
   const [{ id }, { ok, error }] = await Promise.all([params, searchParams]);
 
   const cliente = await prisma.cliente.findUnique({

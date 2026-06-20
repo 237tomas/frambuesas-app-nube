@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
 const nuevoClienteSchema = z.object({
@@ -25,6 +26,8 @@ const nuevoClienteSchema = z.object({
 });
 
 export async function crearCliente(formData: FormData) {
+  await requireAdmin();
+
   const rawData = {
     rut: formData.get("rut"),
     nombre: formData.get("nombre"),

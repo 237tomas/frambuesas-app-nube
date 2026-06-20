@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { requireAdmin } from "@/lib/admin-auth";
 import { crearComprobanteParaCliente } from "@/lib/comprobante-service";
 
 const crearComprobanteSchema = z.object({
@@ -16,6 +17,8 @@ const crearComprobanteSchema = z.object({
 });
 
 export async function crearComprobante(formData: FormData) {
+  await requireAdmin();
+
   const parsed = crearComprobanteSchema.safeParse({
     clienteId: formData.get("clienteId"),
     kilos: formData.get("kilos"),

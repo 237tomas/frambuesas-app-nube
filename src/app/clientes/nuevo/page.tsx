@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { crearCliente } from "./actions";
 
 export const metadata: Metadata = {
@@ -33,6 +34,8 @@ function getErrorMessage(error: string | undefined): string | null {
 export default async function NuevoClientePage({
   searchParams,
 }: NuevoClientePageProps) {
+  await requireAdmin();
+
   const { ok, error } = await searchParams;
   const errorMessage = getErrorMessage(error);
   const successMessage = ok === "1" ? "Cliente guardado correctamente." : null;

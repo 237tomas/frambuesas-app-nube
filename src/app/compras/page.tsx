@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { ClienteSearchField } from "@/app/comprobantes/cliente-search-field";
 import { prisma } from "@/lib/prisma";
 import {
@@ -52,6 +53,8 @@ function formatCLP(value: number): string {
 }
 
 export default async function ComprasPage({ searchParams }: ComprasPageProps) {
+  await requireAdmin();
+
   const { ok, error, clienteId } = await searchParams;
   const clientes = await prisma.cliente.findMany({
     where: { activo: true },

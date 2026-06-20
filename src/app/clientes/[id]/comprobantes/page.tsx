@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getComprobantesBucket, getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -86,6 +87,8 @@ export default async function ComprobantesPage({
   params,
   searchParams,
 }: ComprobantesPageProps) {
+  await requireAdmin();
+
   const [{ id }, { ok, error, from, to }] = await Promise.all([params, searchParams]);
   const fromDate = parseDateStart(from);
   const toDate = parseDateEnd(to);

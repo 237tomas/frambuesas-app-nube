@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { toggleClienteActivo } from "./actions";
 
@@ -38,6 +39,8 @@ function getMessage(
 }
 
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
+  await requireAdmin();
+
   const { ok, error } = await searchParams;
   const message = getMessage(ok, error);
   const isDatabaseConfigured = hasDatabaseUrl();

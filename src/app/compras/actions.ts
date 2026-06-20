@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { requireAdmin } from "@/lib/admin-auth";
 import { crearComprobanteParaCliente } from "@/lib/comprobante-service";
 
 const crearCompraSchema = z.object({
@@ -31,6 +32,8 @@ function buildRedirectUrl(params: {
 }
 
 export async function crearCompra(formData: FormData) {
+  await requireAdmin();
+
   const rawClienteId = String(formData.get("clienteId") ?? "");
   const parsed = crearCompraSchema.safeParse({
     clienteId: rawClienteId,

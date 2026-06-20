@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
   getComprobantesBucket,
@@ -75,6 +76,8 @@ function buildWhatsappMessage(params: {
 export default async function ComprobantesGlobalPage({
   searchParams,
 }: ComprobantesGlobalPageProps) {
+  await requireAdmin();
+
   const { clienteId, from, to, page } = await searchParams;
   const fromDate = parseDateStart(from);
   const toDate = parseDateEnd(to);

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/admin-auth";
 import { generarComprobantePdfBuffer } from "@/lib/comprobante-pdf";
 import {
   getComprobantesBucket,
@@ -50,6 +51,8 @@ async function createUniqueShortCode(): Promise<string> {
 }
 
 export async function crearComprobanteParaCliente(input: CrearComprobanteInput) {
+  await requireAdmin();
+
   const cliente = await prisma.cliente.findUnique({
     where: { id: input.clienteId },
   });
