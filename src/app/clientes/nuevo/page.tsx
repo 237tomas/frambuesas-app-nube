@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { crearCliente } from "./actions";
+import { RutInput } from "./rut-input";
 
 export const metadata: Metadata = {
   title: "Nuevo Cliente",
@@ -94,10 +95,9 @@ export default async function NuevoClientePage({
             <label htmlFor="rut" className="text-sm font-medium text-zinc-800">
               RUT
             </label>
-            <input
+            <RutInput
               id="rut"
               name="rut"
-              type="text"
               placeholder="12.345.678-9"
               className="h-11 rounded-xl border border-zinc-300 px-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
               required
