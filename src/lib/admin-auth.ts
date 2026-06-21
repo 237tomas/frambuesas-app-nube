@@ -12,7 +12,7 @@ import {
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
 function hasUsableAdminPassword(): boolean {
-  return Boolean(process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length >= 16);
+  return Boolean(process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length >= 11);
 }
 
 function hasUsableSessionSecret(): boolean {
