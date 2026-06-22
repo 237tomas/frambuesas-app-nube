@@ -31,6 +31,12 @@ export default async function Home() {
             Ver comprobantes
           </Link>
           <Link
+            href="/flujo-caja"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-rose-300 px-6 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
+          >
+            Flujo de caja
+          </Link>
+          <Link
             href="/clientes"
             className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
           >
