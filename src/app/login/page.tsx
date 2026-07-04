@@ -10,7 +10,11 @@ type LoginPageProps = {
 };
 
 function getSafeNextPath(value: string | undefined): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/";
+  return value?.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.includes("\\")
+    ? value
+    : "/";
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -25,7 +29,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ? "La protección de administrador aún no está configurada."
       : error === "credenciales"
         ? "La contraseña no es correcta."
-        : null;
+        : error === "bloqueo"
+          ? "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo."
+          : null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4 py-10">

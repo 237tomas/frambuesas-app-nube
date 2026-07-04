@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-auth";
 import { generarComprobantePdfBuffer } from "@/lib/comprobante-pdf";
@@ -5,6 +6,7 @@ import {
   getComprobantesBucket,
   getSupabaseAdminClient,
 } from "@/lib/supabase-admin";
+import { getChileDateParts } from "@/lib/timezone";
 
 type CrearComprobanteInput = {
   clienteId: string;
@@ -14,22 +16,18 @@ type CrearComprobanteInput = {
 };
 
 function buildFolio(date: Date): string {
-  const y = String(date.getFullYear());
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
-  const rnd = Math.floor(Math.random() * 9000) + 1000;
+  const { year, month, day, hour, minute, second } = getChileDateParts(date);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const rnd = randomInt(1000, 10000);
 
-  return `CP-${y}${m}${d}-${hh}${mm}${ss}-${rnd}`;
+  return `CP-${year}${pad(month)}${pad(day)}-${pad(hour)}${pad(minute)}${pad(second)}-${rnd}`;
 }
 
 function buildShortCode(length = 8): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   let result = "";
   for (let i = 0; i < length; i += 1) {
-    result += alphabet[Math.floor(Math.random() * alphabet.length)];
+    result += alphabet[randomInt(alphabet.length)];
   }
   return result;
 }
@@ -94,19 +92,30 @@ export async function crearComprobanteParaCliente(input: CrearComprobanteInput) 
     return { ok: false as const, reason: "storage" as const, cliente };
   }
 
-  const comprobante = await prisma.comprobante.create({
-    data: {
-      clienteId: cliente.id,
-      folio,
-      shortCode,
-      kilos: input.kilos,
-      precioKilo: input.precioKilo,
-      montoTotal,
-      observaciones: input.observaciones,
-      nombreArchivo,
-      storagePath,
-    },
-  });
+  try {
+    const comprobante = await prisma.comprobante.create({
+      data: {
+        clienteId: cliente.id,
+        folio,
+        shortCode,
+        kilos: input.kilos,
+        precioKilo: input.precioKilo,
+        montoTotal,
+        observaciones: input.observaciones,
+        nombreArchivo,
+        storagePath,
+      },
+    });
 
-  return { ok: true as const, cliente, comprobante };
+    return { ok: true as const, cliente, comprobante };
+  } catch (error) {
+    // El registro no se pudo persistir: eliminamos el PDF ya subido para no
+    // dejar archivos huerfanos en Storage.
+    await supabaseAdmin.storage
+      .from(bucket)
+      .remove([storagePath])
+      .catch(() => undefined);
+
+    throw error;
+  }
 }

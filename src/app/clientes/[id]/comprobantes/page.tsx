@@ -5,6 +5,13 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getComprobantesBucket, getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getPublicAppUrl, isExternallyReachableAppUrl } from "@/lib/app-url";
+import {
+  buildWhatsappMessage,
+  formatCLP,
+  normalizePhoneForWa,
+  parseDateEnd,
+  parseDateStart,
+} from "@/lib/comprobante-ui";
 
 export const metadata: Metadata = {
   title: "Comprobantes",
@@ -13,9 +20,17 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 10;
+
 type ComprobantesPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string; from?: string; to?: string }>;
+  searchParams: Promise<{
+    ok?: string;
+    error?: string;
+    from?: string;
+    to?: string;
+    page?: string;
+  }>;
 };
 
 function getMessage(
@@ -37,61 +52,19 @@ function getMessage(
   return null;
 }
 
-function formatCLP(value: number): string {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function parseDateStart(value: string | undefined): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function parseDateEnd(value: string | undefined): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T23:59:59.999`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function normalizePhoneForWa(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
-
-function buildWhatsappMessage(params: {
-  nombre: string;
-  folio: string;
-  total: string;
-  fecha: string;
-  link: string;
-}): string {
-  return [
-    `Hola ${params.nombre},`,
-    "",
-    "Te compartimos tu comprobante:",
-    `*Folio:* ${params.folio}`,
-    `*Total:* ${params.total}`,
-    `*Fecha:* ${params.fecha}`,
-    "",
-    "Puedes verlo o descargarlo aqui:",
-    params.link,
-    "",
-    "Gracias por confiar en Frambuesas App.",
-  ].join("\n");
-}
-
 export default async function ComprobantesPage({
   params,
   searchParams,
 }: ComprobantesPageProps) {
   await requireAdmin();
 
-  const [{ id }, { ok, error, from, to }] = await Promise.all([params, searchParams]);
+  const [{ id }, { ok, error, from, to, page }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const fromDate = parseDateStart(from);
   const toDate = parseDateEnd(to);
+  const currentPage = Math.max(1, Number.parseInt(page ?? "1", 10) || 1);
 
   const cliente = await prisma.cliente.findUnique({
     where: { id },
@@ -101,20 +74,36 @@ export default async function ComprobantesPage({
     notFound();
   }
 
+  const whereClause = {
+    clienteId: cliente.id,
+    ...(fromDate || toDate
+      ? {
+          createdAt: {
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toDate ? { lte: toDate } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const totalItems = await prisma.comprobante.count({ where: whereClause });
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+
   const comprobantes = await prisma.comprobante.findMany({
-    where: {
-      clienteId: cliente.id,
-      ...(fromDate || toDate
-        ? {
-            createdAt: {
-              ...(fromDate ? { gte: fromDate } : {}),
-              ...(toDate ? { lte: toDate } : {}),
-            },
-          }
-        : {}),
-    },
+    where: whereClause,
     orderBy: { createdAt: "desc" },
+    take: PAGE_SIZE,
+    skip: (safePage - 1) * PAGE_SIZE,
   });
+
+  const makePageHref = (targetPage: number): string => {
+    const query = new URLSearchParams();
+    if (from) query.set("from", from);
+    if (to) query.set("to", to);
+    query.set("page", String(targetPage));
+    return `/clientes/${cliente.id}/comprobantes?${query.toString()}`;
+  };
 
   const message = getMessage(ok, error);
   const bucket = getComprobantesBucket();
@@ -201,6 +190,7 @@ export default async function ComprobantesPage({
         <section>
           <h2 className="mb-3 text-lg font-semibold text-zinc-900">Historial</h2>
           <form className="mb-4 grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-4 sm:items-end">
+            <input type="hidden" name="page" value="1" />
             <div className="grid gap-2 sm:col-span-1">
               <label htmlFor="from" className="text-sm font-medium text-zinc-800">
                 Desde
@@ -246,6 +236,7 @@ export default async function ComprobantesPage({
               Este cliente aun no tiene comprobantes.
             </div>
           ) : (
+            <div className="space-y-4">
             <div className="overflow-x-auto rounded-2xl border border-zinc-200">
               <table className="min-w-full divide-y divide-zinc-200">
                 <thead className="bg-zinc-50">
@@ -334,6 +325,40 @@ export default async function ComprobantesPage({
                   })}
                 </tbody>
               </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-zinc-600">
+                Pagina {safePage} de {totalPages} ({totalItems} comprobantes, {PAGE_SIZE} por pagina)
+              </p>
+              <div className="flex gap-2">
+                {safePage > 1 ? (
+                  <Link
+                    href={makePageHref(safePage - 1)}
+                    className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+                  >
+                    Anterior
+                  </Link>
+                ) : (
+                  <span className="inline-flex h-10 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-400">
+                    Anterior
+                  </span>
+                )}
+
+                {safePage < totalPages ? (
+                  <Link
+                    href={makePageHref(safePage + 1)}
+                    className="inline-flex h-10 items-center rounded-full bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+                  >
+                    Siguiente
+                  </Link>
+                ) : (
+                  <span className="inline-flex h-10 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-400">
+                    Siguiente
+                  </span>
+                )}
+              </div>
+            </div>
             </div>
           )}
         </section>

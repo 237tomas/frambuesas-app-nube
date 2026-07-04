@@ -23,10 +23,14 @@ export async function toggleClienteActivo(formData: FormData) {
     redirect("/clientes?error=estado");
   }
 
-  await prisma.cliente.update({
-    where: { id: parsed.data.id },
-    data: { activo: parsed.data.nextActivo },
-  });
+  try {
+    await prisma.cliente.update({
+      where: { id: parsed.data.id },
+      data: { activo: parsed.data.nextActivo },
+    });
+  } catch {
+    redirect("/clientes?error=estado");
+  }
 
   revalidatePath("/clientes");
   redirect("/clientes?ok=estado");

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { formatCLP } from "@/lib/comprobante-ui";
+import { CHILE_TIME_ZONE, getChileDateParts } from "@/lib/timezone";
 
 export const metadata: Metadata = {
   title: "Flujo de caja",
@@ -10,7 +12,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const CHILE_TIME_ZONE = "America/Santiago";
 const MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
 type FlujoCajaPageProps = {
@@ -22,22 +23,6 @@ type Month = {
   month: number;
   value: string;
 };
-
-function getChileDateParts(date: Date): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: CHILE_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const partMap = new Map(parts.map((part) => [part.type, part.value]));
-
-  return {
-    year: Number(partMap.get("year")),
-    month: Number(partMap.get("month")),
-    day: Number(partMap.get("day")),
-  };
-}
 
 function getCurrentMonth(): Month {
   const { year, month } = getChileDateParts(new Date());
@@ -57,14 +42,6 @@ function parseMonth(value: string | undefined): Month {
     month: Number(match[2]),
     value: value as string,
   };
-}
-
-function formatCLP(value: number): string {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function formatKilos(value: number): string {
