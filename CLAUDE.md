@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Spanish-language web app for a raspberry (frambuesas) business: manage clients (`Cliente`) and generate PDF sales/delivery receipts (`Comprobante`). Receipts are rendered to PDF, uploaded to Supabase Storage, and shared via short links (`/c/[code]`). UI text and route names are in Spanish.
+Spanish-language web app for a raspberry (frambuesas) business that **buys** fruit from growers. Domain quirk: a `Cliente` is a grower/**supplier** the business pays (`precioKiloActual` = price per kilo paid to them), not a customer. Registering a purchase (a "compra") generates a `Comprobante` (a "Comprobante de Entrega" PDF) — there is no separate purchase model, **a compra *is* a `Comprobante`**. Receipts are rendered to PDF (PDFKit), uploaded to Supabase Storage, and shared via short links (`/c/[code]`). `/flujo-caja` aggregates comprobantes as monthly **egresos** (cash out). UI text and route names are in Spanish.
 
 ## Commands
 
@@ -37,9 +37,11 @@ npx prisma migrate deploy                           # apply migrations (also run
 - **`src/lib/prisma.ts`** — lazy singleton `PrismaClient` behind a `Proxy`, using the `@prisma/adapter-pg` driver adapter over a `pg` connection. The generated client lives in **`src/generated/prisma/`** (checked in, `output` in schema) — import `Prisma`/`PrismaClient` from `@/generated/prisma/client`, not `@prisma/client`. Supabase prod connections relax SSL (`rejectUnauthorized: false`).
 - **`src/lib/supabase-admin.ts`** — service-role Supabase client, server-only, used for Storage upload and signed-URL generation. Bucket name from `SUPABASE_COMPROBANTES_BUCKET` (default `comprobantes`).
 - **`src/lib/comprobante-service.ts`** — the core receipt workflow: `crearComprobanteParaCliente` builds a folio + unique `shortCode`, renders the PDF (`comprobante-pdf.ts`, PDFKit), uploads to `clientes/{clienteId}/{folio}.pdf`, then persists the `Comprobante` row. Both the `compras` and per-client `comprobantes` flows call this.
-- **`src/app/c/[code]/route.ts`** — public-ish short-link handler: looks up `shortCode`, mints a 10-minute Supabase signed URL, and 307-redirects to it. This is how PDFs in a private bucket get shared.
+- **`src/app/c/[code]/route.ts`** — public-ish short-link handler: looks up `shortCode`, mints a 10-minute Supabase signed URL, and 307-redirects to it. This is how PDFs in a private bucket get shared. The comprobante list pages only surface these links (and the WhatsApp share button) when `isExternallyReachableAppUrl` (`src/lib/app-url.ts`) confirms the app URL is public — on localhost / private IPs the share UI is hidden.
 
-**Receipt/PDF specifics:** PDFKit is declared in `serverExternalPackages` in `next.config.ts` (must not be bundled). Money fields (`precioKilo`, `montoTotal`, `precioKiloActual`) are stored as integer CLP; `kilos` is a float.
+**Receipt/PDF specifics:** PDFKit is declared in `serverExternalPackages` in `next.config.ts` (must not be bundled). Money fields (`precioKilo`, `montoTotal`, `precioKiloActual`) are stored as integer CLP; `kilos` is a float. UI money/text formatting helpers (`formatCLP`, `buildWhatsappMessage`, date parsers) live in `src/lib/comprobante-ui.ts`.
+
+**Dates — always Chile time.** `src/lib/timezone.ts` (`getChileDateParts`, `CHILE_TIME_ZONE = America/Santiago`) is the single source of truth for local dates. Folios (`CP-YYYYMMDD-HHMMSS-rand`) encode Chile wall-clock time, and `/flujo-caja` groups comprobantes by Chile calendar day. Since Postgres stores `createdAt` in UTC, flujo-caja queries a ±18h-padded UTC window and then re-filters/-groups by Chile parts — never bucket `createdAt` directly.
 
 ## Auth
 
@@ -48,6 +50,7 @@ Password-based single-admin auth, no user accounts.
 - **`src/proxy.ts`** is the Next.js 16 middleware (this version names the file `proxy.ts`, not `middleware.ts`). Its `matcher` gates `/`, `/clientes/*`, `/compras/*`, `/comprobantes/*`, `/flujo-caja/*`, redirecting unauthenticated requests to `/login`.
 - **`src/lib/admin-session.ts`** — signs/verifies a JWT (jose, HS256) stored in the `frambuesas_admin_session` httpOnly cookie, 12h expiry. Requires `ADMIN_SESSION_SECRET` (≥32 chars).
 - **`src/lib/admin-auth.ts`** — `matchesAdminPassword` (constant-time compare against `ADMIN_PASSWORD`, ≥11 chars) and **`requireAdmin()`**, which redirects to `/login` if unauthenticated. Call `requireAdmin()` at the top of every Server Action and protected page/service — the proxy is defense-in-depth, not the only check.
+- **`src/lib/login-rate-limit.ts`** — in-memory, best-effort brute-force limiter (8 failed attempts / 15 min, keyed by `x-forwarded-for`). `login/actions.ts` checks it before verifying the password and clears it on success. Per-process only — it does **not** span Vercel serverless instances, so treat it as a speed bump, not a hard guarantee.
 
 ## Security model
 
@@ -66,3 +69,22 @@ The app is the only trusted path to the data. Migrations `..._enable_rls_and_res
 ## Environment
 
 Copy `.env.example` → `.env.local`. Required: `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `ADMIN_PASSWORD` (≥11 chars), `ADMIN_SESSION_SECRET` (≥32 chars); optional `SUPABASE_COMPROBANTES_BUCKET`. Full setup: `docs/vercel-supabase-setup.md`.
+
+## Feature en desarrollo: Chatbot de consulta de datos
+
+Especificación completa en @docs/1. PRD-chatbot-consulta-datos.md
+
+Resumen: chatbot embebido, accesible desde un ícono en todas las páginas,
+que permite al administrador consultar la base de datos en lenguaje natural
+(teléfono de un productor, última compra, kilos vendidos en un período, etc.)
+en lugar de buscar manualmente.
+
+Restricción clave: SOLO LECTURA. El chatbot usa únicamente queries de lectura
+de Prisma (findMany, findUnique, aggregate, groupBy). Nunca create, update
+ni delete.
+
+Única excepción controlada: el historial del chat (P2.1) persiste en la tabla
+`MensajeChat` vía `src/lib/chat-historial.ts` — ese módulo es el único que
+escribe, y solo sobre ese modelo. `scripts/check-chatbot-readonly.mjs` (corre
+en cada build) verifica ambas cosas: cero escrituras bajo `src/{lib,app}/chatbot`
+y escrituras limitadas a `mensajeChat` en el módulo de historial.

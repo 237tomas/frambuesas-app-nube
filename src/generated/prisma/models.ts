@@ -9,5 +9,6 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/Cliente'
+export type * from './models/MensajeChat'
 export type * from './models/Comprobante'
 export type * from './commonInputTypes'

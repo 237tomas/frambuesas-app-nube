@@ -47,6 +47,11 @@ export { Prisma }
  */
 export type Cliente = Prisma.ClienteModel
 /**
+ * Model MensajeChat
+ * 
+ */
+export type MensajeChat = Prisma.MensajeChatModel
+/**
  * Model Comprobante
  * 
  */

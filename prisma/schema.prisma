@@ -25,6 +25,15 @@ model Cliente {
   updatedAt          DateTime @updatedAt
 }
 
+// Historial del chatbot de consulta de datos (P2.1). Registro puro de
+// mensajes; el id autoincremental garantiza el orden exacto de la conversación.
+model MensajeChat {
+  id        Int      @id @default(autoincrement())
+  rol       String
+  contenido String
+  createdAt DateTime @default(now())
+}
+
 model Comprobante {
   id            String   @id @default(cuid())
   clienteId     String

@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   Cliente: 'Cliente',
+  MensajeChat: 'MensajeChat',
   Comprobante: 'Comprobante'
 } as const
 
@@ -401,7 +402,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "cliente" | "comprobante"
+    modelProps: "cliente" | "mensajeChat" | "comprobante"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -476,6 +477,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ClienteCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ClienteCountAggregateOutputType> | number
+        }
+      }
+    }
+    MensajeChat: {
+      payload: Prisma.$MensajeChatPayload<ExtArgs>
+      fields: Prisma.MensajeChatFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MensajeChatFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MensajeChatFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        findFirst: {
+          args: Prisma.MensajeChatFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MensajeChatFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        findMany: {
+          args: Prisma.MensajeChatFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>[]
+        }
+        create: {
+          args: Prisma.MensajeChatCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        createMany: {
+          args: Prisma.MensajeChatCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MensajeChatCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>[]
+        }
+        delete: {
+          args: Prisma.MensajeChatDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        update: {
+          args: Prisma.MensajeChatUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        deleteMany: {
+          args: Prisma.MensajeChatDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MensajeChatUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MensajeChatUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>[]
+        }
+        upsert: {
+          args: Prisma.MensajeChatUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MensajeChatPayload>
+        }
+        aggregate: {
+          args: Prisma.MensajeChatAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMensajeChat>
+        }
+        groupBy: {
+          args: Prisma.MensajeChatGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MensajeChatGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MensajeChatCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MensajeChatCountAggregateOutputType> | number
         }
       }
     }
@@ -605,6 +680,16 @@ export const ClienteScalarFieldEnum = {
 } as const
 
 export type ClienteScalarFieldEnum = (typeof ClienteScalarFieldEnum)[keyof typeof ClienteScalarFieldEnum]
+
+
+export const MensajeChatScalarFieldEnum = {
+  id: 'id',
+  rol: 'rol',
+  contenido: 'contenido',
+  createdAt: 'createdAt'
+} as const
+
+export type MensajeChatScalarFieldEnum = (typeof MensajeChatScalarFieldEnum)[keyof typeof MensajeChatScalarFieldEnum]
 
 
 export const ComprobanteScalarFieldEnum = {
@@ -812,6 +897,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   cliente?: Prisma.ClienteOmit
+  mensajeChat?: Prisma.MensajeChatOmit
   comprobante?: Prisma.ComprobanteOmit
 }
 
