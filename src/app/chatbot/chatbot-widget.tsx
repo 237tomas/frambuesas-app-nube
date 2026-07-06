@@ -61,6 +61,35 @@ function separarFuente(contenido: string): {
   return { cuerpo: contenido, fuente: null };
 }
 
+// Avatar del asistente: círculo frambuesa (bg-chat-bot) con un ícono de bot.
+// Es decorativo —el rol de asistente ya lo transmite el hilo—, por eso el
+// contenedor va aria-hidden.
+function AvatarBot() {
+  return (
+    <div
+      aria-hidden="true"
+      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chat-bot text-white"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d="M12 8V4H8" />
+        <rect width="16" height="12" x="4" y="8" rx="2" />
+        <path d="M2 14h2" />
+        <path d="M20 14h2" />
+        <path d="M15 13v2" />
+        <path d="M9 13v2" />
+      </svg>
+    </div>
+  );
+}
+
 export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
   const [abierto, setAbierto] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>(mensajesIniciales);
@@ -150,14 +179,14 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
       {abierto ? (
         <section
           aria-label="Asistente de datos"
-          className="flex h-[70vh] max-h-[34rem] w-[calc(100vw-2rem)] max-w-md flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-400/30"
+          className="flex h-[85vh] max-h-[46rem] w-[calc(100vw-2rem)] max-w-md flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-400/30"
         >
-          <header className="flex items-start justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-4">
+          <header className="flex items-start justify-between gap-3 bg-chat-header px-5 py-4">
             <div>
-              <h2 className="text-sm font-bold tracking-tight text-zinc-900">
+              <h2 className="text-sm font-bold tracking-tight text-chat-header-fg">
                 Asistente de datos
               </h2>
-              <p className="mt-0.5 text-xs text-zinc-600">
+              <p className="mt-0.5 text-xs text-chat-header-muted">
                 Consulta productores y compras. Solo lectura.
               </p>
             </div>
@@ -167,7 +196,7 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
                 onClick={borrarHistorial}
                 aria-label="Borrar historial de conversación"
                 title="Borrar historial"
-                className="rounded-full p-1.5 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-700"
+                className="rounded-full p-1.5 text-chat-header-muted transition hover:bg-white/10 hover:text-chat-header-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 motion-reduce:transition-none"
               >
                 <svg
                   aria-hidden="true"
@@ -186,7 +215,7 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
                 type="button"
                 onClick={() => setAbierto(false)}
                 aria-label="Cerrar asistente"
-                className="rounded-full p-1.5 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-700"
+                className="rounded-full p-1.5 text-chat-header-muted transition hover:bg-white/10 hover:text-chat-header-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 motion-reduce:transition-none"
               >
                 <svg
                   aria-hidden="true"
@@ -206,11 +235,28 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
             aria-live="polite"
             className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
           >
-            {mensajes.length === 0 && !pendiente && !error ? (
-              <p className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs text-zinc-600">
-                {SUGERENCIA_INICIAL}
-              </p>
-            ) : null}
+            {/* Bienvenida del bot + sugerencias, siempre visibles (no desaparecen). */}
+            <div className="flex items-start gap-2">
+              <AvatarBot />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="w-fit max-w-full whitespace-pre-wrap rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-2.5 text-sm text-zinc-800">
+                  {SUGERENCIA_INICIAL}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {SUGERENCIAS.map((sugerencia) => (
+                    <button
+                      key={sugerencia.etiqueta}
+                      type="button"
+                      disabled={pendiente}
+                      onClick={() => usarSugerencia(sugerencia)}
+                      className="rounded-xl border border-chat-sugerencia bg-white px-3.5 py-2 text-left text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+                    >
+                      {sugerencia.etiqueta}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             {mensajes.map((mensaje, indice) => {
               if (mensaje.rol === "user") {
@@ -227,24 +273,27 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
               const { cuerpo, fuente } = separarFuente(mensaje.contenido);
 
               return (
-                <p
-                  key={indice}
-                  className="mr-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-2.5 text-sm text-zinc-800"
-                >
-                  {cuerpo}
-                  {fuente ? (
-                    <span className="mt-1.5 block border-t border-zinc-200 pt-1.5 text-xs text-zinc-500">
-                      {fuente}
-                    </span>
-                  ) : null}
-                </p>
+                <div key={indice} className="flex items-start gap-2">
+                  <AvatarBot />
+                  <div className="w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-2.5 text-sm text-zinc-800">
+                    {cuerpo}
+                    {fuente ? (
+                      <span className="mt-1.5 block border-t border-zinc-200 pt-1.5 text-xs text-zinc-500">
+                        {fuente}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               );
             })}
 
             {pendiente ? (
-              <p className="mr-auto w-fit animate-pulse rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-2.5 text-sm text-zinc-500">
-                Consultando…
-              </p>
+              <div className="flex items-start gap-2">
+                <AvatarBot />
+                <p className="w-fit animate-pulse rounded-2xl rounded-bl-md bg-zinc-100 px-4 py-2.5 text-sm text-zinc-500 motion-reduce:animate-none">
+                  Consultando…
+                </p>
+              </div>
             ) : null}
 
             {error ? (
@@ -252,20 +301,6 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
                 {error}
               </p>
             ) : null}
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto border-t border-zinc-100 px-3 pt-2.5 pb-1">
-            {SUGERENCIAS.map((sugerencia) => (
-              <button
-                key={sugerencia.etiqueta}
-                type="button"
-                disabled={pendiente}
-                onClick={() => usarSugerencia(sugerencia)}
-                className="shrink-0 rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs text-zinc-600 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {sugerencia.etiqueta}
-              </button>
-            ))}
           </div>
 
           <form onSubmit={enviar} className="p-3">
@@ -278,12 +313,12 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
                 placeholder="Escribe tu consulta…"
                 autoComplete="off"
                 onChange={(event) => setTexto(event.target.value)}
-                className="h-11 flex-1 rounded-2xl border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
+                className="h-11 flex-1 rounded-2xl border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100 motion-reduce:transition-none"
               />
               <button
                 type="submit"
                 disabled={pendiente || texto.trim().length === 0}
-                className="inline-flex h-11 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 items-center rounded-full bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
               >
                 Enviar
               </button>
@@ -297,7 +332,7 @@ export function ChatbotWidget({ mensajesIniciales }: ChatbotWidgetProps) {
         onClick={() => setAbierto((valor) => !valor)}
         aria-expanded={abierto}
         aria-label={abierto ? "Cerrar asistente de datos" : "Abrir asistente de datos"}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-xl shadow-rose-400/40 transition hover:bg-rose-700"
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-xl shadow-rose-400/40 transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 motion-reduce:transition-none"
       >
         {abierto ? (
           <svg

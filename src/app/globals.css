@@ -12,6 +12,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Paleta del widget de chat "Asistente de datos" (ver chatbot-widget.tsx).
+   Se referencian por clase (bg-chat-header, text-chat-header-fg, …) en lugar de
+   estilos inline. El rojo de acento (burbujas de usuario, botón Enviar y FAB)
+   sigue siendo el `rose-600` de Tailwind. */
+@theme {
+  --color-chat-header: #241015;        /* encabezado: burdeos profundo */
+  --color-chat-header-fg: #f5ece9;     /* encabezado: título */
+  --color-chat-header-muted: #c9a9ae;  /* encabezado: subtítulo e íconos */
+  --color-chat-bot: #b84a56;           /* fondo del avatar del bot (frambuesa) */
+  --color-chat-sugerencia: #e4dede;    /* borde de los botones de sugerencia */
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
