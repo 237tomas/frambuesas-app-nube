@@ -15,8 +15,9 @@ Spanish-language web app for a raspberry (frambuesas) business that **buys** fru
 ```bash
 npm run dev      # local dev server (http://localhost:3000)
 npm run lint     # ESLint (eslint-config-next flat config)
-npm run build    # baseline-prisma.mjs + prisma generate + next build
+npm run build    # check-chatbot-readonly + baseline-prisma + prisma generate + next build
 npm run start    # run production build
+npm run check:chatbot  # verify the chatbot stays read-only (also runs in build)
 ```
 
 There is **no test suite** and no typecheck script; run `npx tsc --noEmit` for a type check. Lint a single directory with `npx eslint src/app/clientes`.
@@ -68,23 +69,45 @@ The app is the only trusted path to the data. Migrations `..._enable_rls_and_res
 
 ## Environment
 
-Copy `.env.example` → `.env.local`. Required: `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `ADMIN_PASSWORD` (≥11 chars), `ADMIN_SESSION_SECRET` (≥32 chars); optional `SUPABASE_COMPROBANTES_BUCKET`. Full setup: `docs/vercel-supabase-setup.md`.
+Copy `.env.example` → `.env.local`. Required: `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `ADMIN_PASSWORD` (≥11 chars), `ADMIN_SESSION_SECRET` (≥32 chars); optional `SUPABASE_COMPROBANTES_BUCKET`. Chatbot: `OPENAI_API_KEY` (server-only, never client-exposed), optional `OPENAI_CHAT_MODEL` (default `gpt-5.4-mini`). Full setup: `docs/vercel-supabase-setup.md`.
 
-## Feature en desarrollo: Chatbot de consulta de datos
+## Chatbot de consulta de datos
 
-Especificación completa en @docs/1. PRD-chatbot-consulta-datos.md
+Chatbot embebido (ícono flotante en toda página protegida) que deja al admin
+consultar la base en lenguaje natural (teléfono de un productor, última compra,
+kilos vendidos en un período…) en lugar de buscar a mano. PRD completo en
+@docs/1. PRD-chatbot-consulta-datos.md.
 
-Resumen: chatbot embebido, accesible desde un ícono en todas las páginas,
-que permite al administrador consultar la base de datos en lenguaje natural
-(teléfono de un productor, última compra, kilos vendidos en un período, etc.)
-en lugar de buscar manualmente.
+**Arquitectura — agente OpenAI con tool-calling, todo en el servidor:**
 
-Restricción clave: SOLO LECTURA. El chatbot usa únicamente queries de lectura
-de Prisma (findMany, findUnique, aggregate, groupBy). Nunca create, update
-ni delete.
+- **`src/lib/chatbot/openai.ts`** — cliente OpenAI singleton (server-only). Modelo
+  desde `OPENAI_CHAT_MODEL` (default `gpt-5.4-mini`); `hasOpenAIEnv()` para chequear
+  la key sin instanciar.
+- **`src/lib/chatbot/tools.ts`** — el catálogo de herramientas (`buscarProductor`,
+  `ultimaCompra`, `kilosPorPeriodo`, `topProductoresPorKilos`, `productoresInactivos`).
+  Cada una se declara con `crearHerramienta` (schema Zod + JSON-schema para OpenAI) y
+  ejecuta **solo lecturas** de Prisma (`findMany`/`findFirst`/`aggregate`/`groupBy`/
+  `count`). Para agregar una herramienta, defínela aquí y súmala a `listaHerramientas`.
+  La búsqueda de productores trae toda la cartera (~100) y filtra en memoria para
+  ignorar tildes/mayúsculas (misma normalización que el buscador de la UI).
+- **`src/lib/chatbot/agente.ts`** — `responderPregunta` corre el bucle de tool-use
+  (system prompt + historial + pregunta → hasta `MAX_ITERACIONES=6` vueltas de
+  llamadas a herramientas). El system prompt impone: solo lectura, nunca inventar
+  datos, pedir aclaración si `buscarProductor` devuelve varios, y cerrar con una
+  línea `Fuente:` de trazabilidad. Texto plano, sin Markdown.
+- **`src/lib/chatbot/fechas.ts`** — resuelve períodos relativos ("este mes",
+  "últimas 3 semanas") a rangos UTC en hora de Chile (usa `src/lib/timezone.ts`).
+- **`src/app/chatbot/actions.ts`** — Server Actions `preguntar` / `limpiarHistorial`;
+  ambas llaman `requireAdmin()` (alcanzables por POST directo). Valida con Zod.
+- **`src/app/chatbot/chatbot-gate.tsx`** + **`chatbot-widget.tsx`** — el gate
+  renderiza el widget solo con sesión de admin válida y le pasa el historial
+  persistido como conversación inicial.
 
-Única excepción controlada: el historial del chat (P2.1) persiste en la tabla
-`MensajeChat` vía `src/lib/chat-historial.ts` — ese módulo es el único que
-escribe, y solo sobre ese modelo. `scripts/check-chatbot-readonly.mjs` (corre
-en cada build) verifica ambas cosas: cero escrituras bajo `src/{lib,app}/chatbot`
-y escrituras limitadas a `mensajeChat` en el módulo de historial.
+**Restricción clave — SOLO LECTURA.** El chatbot nunca hace `create`/`update`/
+`delete`. Única excepción controlada: el historial del chat persiste en la tabla
+`MensajeChat` vía **`src/lib/chat-historial.ts`** — ese módulo es el único que
+escribe, y solo sobre ese modelo (con poda a los últimos 400 mensajes; degrada con
+gracia si la tabla aún no existe). `scripts/check-chatbot-readonly.mjs` (corre en
+cada build y como `npm run check:chatbot`) hace cumplir ambas cosas: cero escrituras
+bajo `src/{lib,app}/chatbot`, y escrituras limitadas a `mensajeChat` en el módulo de
+historial. Si tu cambio rompe el build por este check, es intencional.
