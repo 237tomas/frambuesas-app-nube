@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { RutInput } from "../../rut-input";
 import { actualizarCliente } from "./actions";
 
 export const metadata: Metadata = {
@@ -102,10 +103,9 @@ export default async function EditarClientePage({
             <label htmlFor="rut" className="text-sm font-medium text-zinc-800">
               RUT
             </label>
-            <input
+            <RutInput
               id="rut"
               name="rut"
-              type="text"
               defaultValue={cliente.rut}
               className="h-11 rounded-xl border border-zinc-300 px-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-zinc-500 focus:ring-4 focus:ring-zinc-100"
               required

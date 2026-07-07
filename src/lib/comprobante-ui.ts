@@ -1,3 +1,7 @@
+import { chileDateToUtc } from "@/lib/timezone";
+
+const DATE_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 export function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
@@ -6,16 +10,28 @@ export function formatCLP(value: number): string {
   }).format(value);
 }
 
+// Los filtros de fecha se interpretan en horario de Chile, sin importar la
+// zona horaria del servidor.
 export function parseDateStart(value: string | undefined): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = value?.match(DATE_PATTERN);
+  if (!match) return null;
+
+  return chileDateToUtc(Number(match[1]), Number(match[2]), Number(match[3]));
 }
 
 export function parseDateEnd(value: string | undefined): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T23:59:59.999`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = value?.match(DATE_PATTERN);
+  if (!match) return null;
+
+  return chileDateToUtc(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    23,
+    59,
+    59,
+    999,
+  );
 }
 
 export function normalizePhoneForWa(phone: string): string {

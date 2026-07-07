@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { CHILE_TIME_ZONE, getChileDateParts } from "@/lib/timezone";
+import { CHILE_TIME_ZONE, chileDateToUtc, getChileDateParts } from "@/lib/timezone";
 
 // Resolución de períodos en horario de Chile. La base de datos guarda `createdAt`
 // en UTC, así que convertimos cada frontera de calendario chileno al instante UTC
@@ -49,18 +49,9 @@ const MESES = [
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-// Offset (hora local de Chile menos UTC, en ms) vigente en ese instante.
-function offsetChileMs(instant: Date): number {
-  const p = getChileDateParts(instant);
-  const comoUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-  return comoUtc - instant.getTime();
-}
-
 // Convierte una hora de pared chilena (año/mes/día 00:00) al instante UTC real.
 function horaChileAUtc(year: number, month: number, day: number): Date {
-  const estimado = Date.UTC(year, month - 1, day);
-  const offset = offsetChileMs(new Date(estimado));
-  return new Date(estimado - offset);
+  return chileDateToUtc(year, month, day);
 }
 
 function inicioDeMes(year: number, month: number): RangoResuelto {

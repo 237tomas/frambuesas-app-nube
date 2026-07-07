@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+# Certificados CA públicos de Supabase (no son secretos; se versionan como referencia).
+!prisma/certs/*.pem
 
 # debug
 npm-debug.log*

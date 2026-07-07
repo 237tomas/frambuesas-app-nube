@@ -108,7 +108,7 @@ export async function crearComprobanteParaCliente(input: CrearComprobanteInput) 
     });
 
     return { ok: true as const, cliente, comprobante };
-  } catch (error) {
+  } catch {
     // El registro no se pudo persistir: eliminamos el PDF ya subido para no
     // dejar archivos huerfanos en Storage.
     await supabaseAdmin.storage
@@ -116,6 +116,6 @@ export async function crearComprobanteParaCliente(input: CrearComprobanteInput) 
       .remove([storagePath])
       .catch(() => undefined);
 
-    throw error;
+    return { ok: false as const, reason: "db" as const, cliente };
   }
 }

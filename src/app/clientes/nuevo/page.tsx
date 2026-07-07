@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { crearCliente } from "./actions";
-import { RutInput } from "./rut-input";
+import { RutInput } from "../rut-input";
 
 export const metadata: Metadata = {
   title: "Nuevo Cliente",

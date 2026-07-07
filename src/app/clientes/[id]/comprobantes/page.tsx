@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getComprobantesBucket, getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { hasSupabaseAdminEnv } from "@/lib/supabase-admin";
 import { getPublicAppUrl, isExternallyReachableAppUrl } from "@/lib/app-url";
 import {
   buildWhatsappMessage,
@@ -12,6 +12,8 @@ import {
   parseDateEnd,
   parseDateStart,
 } from "@/lib/comprobante-ui";
+import { formatFechaChile } from "@/lib/timezone";
+import { buildSignedUrlMaps } from "@/lib/signed-urls";
 
 export const metadata: Metadata = {
   title: "Comprobantes",
@@ -49,6 +51,10 @@ function getMessage(
     return { kind: "error", text: "No se pudo subir el PDF a Supabase Storage." };
   }
 
+  if (error === "db") {
+    return { kind: "error", text: "No se pudo guardar el comprobante. Inténtalo otra vez." };
+  }
+
   return null;
 }
 
@@ -66,16 +72,8 @@ export default async function ComprobantesPage({
   const toDate = parseDateEnd(to);
   const currentPage = Math.max(1, Number.parseInt(page ?? "1", 10) || 1);
 
-  const cliente = await prisma.cliente.findUnique({
-    where: { id },
-  });
-
-  if (!cliente) {
-    notFound();
-  }
-
   const whereClause = {
-    clienteId: cliente.id,
+    clienteId: id,
     ...(fromDate || toDate
       ? {
           createdAt: {
@@ -86,7 +84,17 @@ export default async function ComprobantesPage({
       : {}),
   };
 
-  const totalItems = await prisma.comprobante.count({ where: whereClause });
+  const [cliente, totalItems] = await Promise.all([
+    prisma.cliente.findUnique({
+      where: { id },
+    }),
+    prisma.comprobante.count({ where: whereClause }),
+  ]);
+
+  if (!cliente) {
+    notFound();
+  }
+
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
 
@@ -106,37 +114,11 @@ export default async function ComprobantesPage({
   };
 
   const message = getMessage(ok, error);
-  const bucket = getComprobantesBucket();
-  const supabaseAdmin = getSupabaseAdminClient();
   const appUrl = getPublicAppUrl();
   const canUseShortLinks = isExternallyReachableAppUrl(appUrl);
-
-  const signedDownloadUrlMap = new Map<string, string>();
-  const signedViewUrlMap = new Map<string, string>();
-  if (comprobantes.length > 0) {
-    const signedResults = await Promise.all(
-      comprobantes.map((item) =>
-        Promise.all([
-          supabaseAdmin.storage.from(bucket).createSignedUrl(item.storagePath, 60 * 60),
-          supabaseAdmin.storage
-            .from(bucket)
-            .createSignedUrl(item.storagePath, 60 * 60, {
-              download: `comprobante-${item.folio}.pdf`,
-            }),
-        ]),
-      ),
-    );
-
-    signedResults.forEach(([viewResult, downloadResult], index) => {
-      const storagePath = comprobantes[index].storagePath;
-      if (!viewResult.error && viewResult.data?.signedUrl) {
-        signedViewUrlMap.set(storagePath, viewResult.data.signedUrl);
-      }
-      if (!downloadResult.error && downloadResult.data?.signedUrl) {
-        signedDownloadUrlMap.set(storagePath, downloadResult.data.signedUrl);
-      }
-    });
-  }
+  const hasStorageConfig = hasSupabaseAdminEnv();
+  const { viewUrls: signedViewUrlMap, downloadUrls: signedDownloadUrlMap } =
+    await buildSignedUrlMaps(comprobantes);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4 py-10">
@@ -185,6 +167,14 @@ export default async function ComprobantesPage({
           >
             {message.text}
           </p>
+        ) : null}
+
+        {!hasStorageConfig ? (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            Faltan variables de Supabase para generar enlaces de descarga y WhatsApp.
+            Configura <code>NEXT_PUBLIC_SUPABASE_URL</code> y{" "}
+            <code>SUPABASE_SERVICE_ROLE_KEY</code> para habilitarlos.
+          </div>
         ) : null}
 
         <section>
@@ -271,7 +261,7 @@ export default async function ComprobantesPage({
                           {formatCLP(item.montoTotal)}
                         </td>
                         <td className="px-4 py-3 text-sm text-zinc-700">
-                          {item.createdAt.toLocaleString("es-CL")}
+                          {formatFechaChile(item.createdAt)}
                         </td>
                         <td className="px-4 py-3 text-right text-sm">
                           <div className="flex justify-end gap-2">
@@ -305,7 +295,7 @@ export default async function ComprobantesPage({
                                     nombre: cliente.nombre,
                                     folio: item.folio,
                                     total: formatCLP(item.montoTotal),
-                                    fecha: item.createdAt.toLocaleString("es-CL"),
+                                    fecha: formatFechaChile(item.createdAt),
                                     link: canUseShortLinks && item.shortCode
                                       ? `${appUrl}/c/${item.shortCode}`
                                       : (signedDownloadUrl ?? ""),

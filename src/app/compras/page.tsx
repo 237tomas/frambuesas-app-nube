@@ -3,11 +3,10 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ClienteSearchField } from "@/app/comprobantes/cliente-search-field";
 import { prisma } from "@/lib/prisma";
-import {
-  getComprobantesBucket,
-  getSupabaseAdminClient,
-  hasSupabaseAdminEnv,
-} from "@/lib/supabase-admin";
+import { hasSupabaseAdminEnv } from "@/lib/supabase-admin";
+import { buildSignedUrlMaps } from "@/lib/signed-urls";
+import { formatCLP } from "@/lib/comprobante-ui";
+import { formatFechaChile } from "@/lib/timezone";
 import { crearCompra } from "./actions";
 
 export const metadata: Metadata = {
@@ -41,75 +40,46 @@ function getMessage(
     return { kind: "error", text: "No se pudo subir el PDF a Supabase Storage." };
   }
 
-  return null;
-}
+  if (error === "db") {
+    return { kind: "error", text: "No se pudo guardar el comprobante. Inténtalo otra vez." };
+  }
 
-function formatCLP(value: number): string {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value);
+  return null;
 }
 
 export default async function ComprasPage({ searchParams }: ComprasPageProps) {
   await requireAdmin();
 
   const { ok, error, clienteId } = await searchParams;
-  const clientes = await prisma.cliente.findMany({
-    where: { activo: true },
-    orderBy: { nombre: "asc" },
-    select: {
-      id: true,
-      nombre: true,
-      rut: true,
-      precioKiloActual: true,
-    },
-  });
-  const ultimosComprobantes = await prisma.comprobante.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    include: {
-      cliente: {
-        select: {
-          nombre: true,
-          rut: true,
+  const [clientes, ultimosComprobantes] = await Promise.all([
+    prisma.cliente.findMany({
+      where: { activo: true },
+      orderBy: { nombre: "asc" },
+      select: {
+        id: true,
+        nombre: true,
+        rut: true,
+        precioKiloActual: true,
+      },
+    }),
+    prisma.comprobante.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: {
+        cliente: {
+          select: {
+            nombre: true,
+            rut: true,
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
   const selectedCliente = clientes.find((cliente) => cliente.id === clienteId) ?? null;
   const message = getMessage(ok, error);
   const hasStorageConfig = hasSupabaseAdminEnv();
-  const signedDownloadUrlMap = new Map<string, string>();
-  const signedViewUrlMap = new Map<string, string>();
-
-  if (hasStorageConfig && ultimosComprobantes.length > 0) {
-    const bucket = getComprobantesBucket();
-    const supabaseAdmin = getSupabaseAdminClient();
-    const signedResults = await Promise.all(
-      ultimosComprobantes.map((item) =>
-        Promise.all([
-          supabaseAdmin.storage.from(bucket).createSignedUrl(item.storagePath, 60 * 60),
-          supabaseAdmin.storage
-            .from(bucket)
-            .createSignedUrl(item.storagePath, 60 * 60, {
-              download: `comprobante-${item.folio}.pdf`,
-            }),
-        ]),
-      ),
-    );
-
-    signedResults.forEach(([viewResult, downloadResult], index) => {
-      const storagePath = ultimosComprobantes[index].storagePath;
-      if (!viewResult.error && viewResult.data?.signedUrl) {
-        signedViewUrlMap.set(storagePath, viewResult.data.signedUrl);
-      }
-      if (!downloadResult.error && downloadResult.data?.signedUrl) {
-        signedDownloadUrlMap.set(storagePath, downloadResult.data.signedUrl);
-      }
-    });
-  }
+  const { viewUrls: signedViewUrlMap, downloadUrls: signedDownloadUrlMap } =
+    await buildSignedUrlMaps(ultimosComprobantes);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4 py-8">
@@ -317,7 +287,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
                           {formatCLP(item.montoTotal)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-700">
-                          {item.createdAt.toLocaleString("es-CL")}
+                          {formatFechaChile(item.createdAt)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                           {viewUrl || downloadUrl ? (

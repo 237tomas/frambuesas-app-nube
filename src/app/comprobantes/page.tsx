@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import {
-  getComprobantesBucket,
-  getSupabaseAdminClient,
-  hasSupabaseAdminEnv,
-} from "@/lib/supabase-admin";
+import { hasSupabaseAdminEnv } from "@/lib/supabase-admin";
 import { getPublicAppUrl, isExternallyReachableAppUrl } from "@/lib/app-url";
 import {
   buildWhatsappMessage,
@@ -15,6 +11,8 @@ import {
   parseDateEnd,
   parseDateStart,
 } from "@/lib/comprobante-ui";
+import { formatFechaChile } from "@/lib/timezone";
+import { buildSignedUrlMaps } from "@/lib/signed-urls";
 import { ClienteSearchField } from "./cliente-search-field";
 
 export const metadata: Metadata = {
@@ -44,11 +42,6 @@ export default async function ComprobantesGlobalPage({
   const toDate = parseDateEnd(to);
   const currentPage = Math.max(1, Number.parseInt(page ?? "1", 10) || 1);
 
-  const clientes = await prisma.cliente.findMany({
-    orderBy: { nombre: "asc" },
-    select: { id: true, nombre: true, rut: true, telefonoWhatsapp: true },
-  });
-
   const whereClause = {
     ...(clienteId ? { clienteId } : {}),
     ...(fromDate || toDate
@@ -61,9 +54,15 @@ export default async function ComprobantesGlobalPage({
       : {}),
   };
 
-  const totalItems = await prisma.comprobante.count({
-    where: whereClause,
-  });
+  const [clientes, totalItems] = await Promise.all([
+    prisma.cliente.findMany({
+      orderBy: { nombre: "asc" },
+      select: { id: true, nombre: true, rut: true, telefonoWhatsapp: true },
+    }),
+    prisma.comprobante.count({
+      where: whereClause,
+    }),
+  ]);
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
 
@@ -79,34 +78,8 @@ export default async function ComprobantesGlobalPage({
   const canUseShortLinks = isExternallyReachableAppUrl(appUrl);
   const hasStorageConfig = hasSupabaseAdminEnv();
 
-  const signedDownloadUrlMap = new Map<string, string>();
-  const signedViewUrlMap = new Map<string, string>();
-  if (hasStorageConfig && comprobantes.length > 0) {
-    const bucket = getComprobantesBucket();
-    const supabaseAdmin = getSupabaseAdminClient();
-    const signedResults = await Promise.all(
-      comprobantes.map((item) =>
-        Promise.all([
-          supabaseAdmin.storage.from(bucket).createSignedUrl(item.storagePath, 60 * 60),
-          supabaseAdmin.storage
-            .from(bucket)
-            .createSignedUrl(item.storagePath, 60 * 60, {
-              download: `comprobante-${item.folio}.pdf`,
-            }),
-        ]),
-      ),
-    );
-
-    signedResults.forEach(([viewResult, downloadResult], index) => {
-      const storagePath = comprobantes[index].storagePath;
-      if (!viewResult.error && viewResult.data?.signedUrl) {
-        signedViewUrlMap.set(storagePath, viewResult.data.signedUrl);
-      }
-      if (!downloadResult.error && downloadResult.data?.signedUrl) {
-        signedDownloadUrlMap.set(storagePath, downloadResult.data.signedUrl);
-      }
-    });
-  }
+  const { viewUrls: signedViewUrlMap, downloadUrls: signedDownloadUrlMap } =
+    await buildSignedUrlMaps(comprobantes);
 
   const makePageHref = (targetPage: number): string => {
     const params = new URLSearchParams();
@@ -262,7 +235,7 @@ export default async function ComprobantesGlobalPage({
                         nombre: cliente?.nombre ?? "cliente",
                         folio: item.folio,
                         total: formatCLP(item.montoTotal),
-                        fecha: item.createdAt.toLocaleString("es-CL"),
+                        fecha: formatFechaChile(item.createdAt),
                         link: linkForMessage,
                       }),
                     );
@@ -281,7 +254,7 @@ export default async function ComprobantesGlobalPage({
                         <td className="px-4 py-3 text-sm font-medium text-zinc-900">{item.folio}</td>
                         <td className="px-4 py-3 text-sm text-zinc-700">{formatCLP(item.montoTotal)}</td>
                         <td className="px-4 py-3 text-sm text-zinc-700">
-                          {item.createdAt.toLocaleString("es-CL")}
+                          {formatFechaChile(item.createdAt)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">

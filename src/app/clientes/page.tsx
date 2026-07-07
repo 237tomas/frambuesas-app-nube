@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-auth";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { formatCLP } from "@/lib/comprobante-ui";
 import { toggleClienteActivo } from "./actions";
 
 export const metadata: Metadata = {
@@ -10,14 +11,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-function formatPrecio(value: number): string {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 type ClientesPageProps = {
   searchParams: Promise<{ ok?: string; error?: string }>;
@@ -161,7 +154,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
                       {cliente.telefonoWhatsapp}
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-700">
-                      {formatPrecio(cliente.precioKiloActual)}
+                      {formatCLP(cliente.precioKiloActual)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

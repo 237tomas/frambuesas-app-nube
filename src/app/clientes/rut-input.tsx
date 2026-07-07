@@ -13,7 +13,7 @@ function normalizeRut(value: string): string {
     : numbers.slice(0, 9);
 }
 
-export function formatRut(value: string): string {
+function formatRut(value: string): string {
   const normalizedRut = normalizeRut(value);
 
   if (normalizedRut.length <= 1) {

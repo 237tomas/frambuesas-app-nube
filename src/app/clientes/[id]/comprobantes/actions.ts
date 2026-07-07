@@ -39,7 +39,7 @@ export async function crearComprobante(formData: FormData) {
   }
 
   if (!result.ok) {
-    redirect(`/clientes/${result.cliente.id}/comprobantes?error=storage`);
+    redirect(`/clientes/${result.cliente.id}/comprobantes?error=${result.reason}`);
   }
 
   revalidatePath("/clientes");

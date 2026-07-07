@@ -10,12 +10,24 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is required to apply Prisma migrations.");
 }
 
+// Con DATABASE_CA_CERT (PEM de la CA de Supabase) se valida TLS de verdad;
+// sin ella, se mantiene la conexión cifrada sin validar el emisor.
+function getSslConfig(hostname) {
+  const caCert = process.env.DATABASE_CA_CERT;
+
+  if (caCert) {
+    return { ssl: { ca: caCert.replace(/\\n/g, "\n") } };
+  }
+
+  return hostname.endsWith("supabase.com")
+    ? { ssl: { rejectUnauthorized: false } }
+    : {};
+}
+
 const databaseUrl = new URL(connectionString);
 const client = new pg.Client({
   connectionString,
-  ...(databaseUrl.hostname.endsWith("supabase.com")
-    ? { ssl: { rejectUnauthorized: false } }
-    : {}),
+  ...getSslConfig(databaseUrl.hostname),
 });
 
 function runPrisma(...args) {
